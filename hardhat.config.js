@@ -4,15 +4,23 @@ require("hardhat-gas-reporter");
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-    solidity: "0.8.15",
+    solidity: {
+        version: "0.8.15",
+        settings: {
+            optimizer: {
+                enabled: true,
+                runs: 2000,
+            }
+        }
+    },
     networks: {
         alfajores: {
-            url: "https://alfajores-forno.celo-testnet.org/",
+            url: process.env.RPC_URL,
             chainId: 44787,
             accounts: {
                 mnemonic: process.env.MNEMONIC,
                 path: "m/44'/60'/0'/0",
-            },
+            }
         },
     },
     gasReporter: {
