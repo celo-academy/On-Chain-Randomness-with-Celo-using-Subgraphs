@@ -4,8 +4,10 @@ pragma solidity 0.8.15;
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./interface/IRandom.sol";
 import "./interface/ILotteryClub.sol";
+import "./interface/ILotteryClubNFT.sol";
 
 import "./LotteryClub.sol";
+import "./LotteryClubNFT.sol";
 
 contract LotteryClubFactory {
     using SafeMath for uint256;
@@ -15,7 +17,8 @@ contract LotteryClubFactory {
     mapping(address => bool) private _clubStatus;
     mapping(address => uint256) private _clubOwnerCounter;
 
-    event Club(address indexed club_, address indexed manager_, string name, uint256 reward_, uint256 deposit_, uint256 membersLimit_);
+    event Club(address indexed club_, address indexed manager_, string name_, uint256 reward_, uint256 deposit_, uint256 membersLimit_);
+    event ClubNFT(address indexed club_, address indexed manager_, string name_, uint256 deposit_, uint256 membersLimit_);
 
     function createClub(
         string calldata name_,
@@ -23,8 +26,10 @@ contract LotteryClubFactory {
         uint256 membersLimit_,
         address rewardAddress_
     ) external {
+        require(_clubOwnerCounter[msg.sender] <= MAX_OWNER_CLUB);
         require(deposit_ > 0);
         require(membersLimit_ > 0);
+        require(rewardAddress_ != address(0));
         (uint256 reward, uint256 managerFee) = _calculateReward(deposit_, membersLimit_);
         bytes32 salt = keccak256(
             abi.encodePacked(name_, deposit_, membersLimit_, rewardAddress_, msg.sender)
@@ -50,6 +55,26 @@ contract LotteryClubFactory {
             deposit_,
             membersLimit_
         );
+    }
+
+    function createClubNFT(string calldata name_, uint256 deposit_, uint256 membersLimit_) external {
+        require(_clubOwnerCounter[msg.sender] <= MAX_OWNER_CLUB);
+        require(deposit_ > 0);
+        require(membersLimit_ > 0);
+        bytes32 salt = keccak256(
+            abi.encodePacked(name_, deposit_, membersLimit_, msg.sender)
+        );
+        require(!_checkAddress(salt));
+        LotteryClubNFT club = (new LotteryClubNFT){salt:salt}();
+        ILotteryClubNFT(address(club)).initialize(
+            name_,
+            deposit_,
+            membersLimit_,
+            msg.sender
+        );
+        _clubStatus[address(club)] = true;
+        _clubOwnerCounter[msg.sender] += 1;
+        emit ClubNFT(address(club), msg.sender, name_, deposit_, membersLimit_);
     }
 
     function _checkAddress(bytes32 salt_) private view returns (bool) {

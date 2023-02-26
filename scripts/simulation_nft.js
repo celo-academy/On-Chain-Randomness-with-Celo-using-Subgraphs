@@ -1,75 +1,69 @@
 const hre = require("hardhat");
 
-async function setup(nft) {
-    console.log("Setting up accounts");
+async function setup(){
+    console.log("Setting up account");
     const accountList = await hre.ethers.getSigners();
-    for (let i = 1; i <= 9; i++) {
+    for(let i = 1; i <= 9; i++) {
+        console.log("Transfer to : ", accountList[i].address);
         let tx = {
             to: accountList[i].address,
-            value: hre.ethers.utils.parseEther("1.5"),
-        };
-        await accountList[0].sendTransaction(tx).then((txObject) => {
-            console.log("======================================");
-            console.log("Account:          ", accountList[i].address);
-            console.log("Transaction Hash: ", txObject.hash);
-            console.log("======================================");
-        });
+            value: hre.ethers.utils.parseEther("2")
+        }
+        let txTransfer = await accountList[0].sendTransaction(tx);
+        await txTransfer.wait();
     }
     console.clear();
-
-    console.log("Request sample NFT");
-    const txRequest = await nft.connect(accountList[1]).getSampleNFT();
-    await txRequest.wait();
-    console.clear();
-
-    return accountList;
+    return accountList
 }
 
-async function simulation(accountList, nft, factory) {
-    console.log("Simulation");
-    console.clear();
+async function simulation(accountList, factory, faucet) {
+    const manager = accountList[1];
+    const deposit = hre.ethers.utils.parseEther("1");
 
-    let manager = accountList[1];
-    let ticketPrice = hre.ethers.utils.parseEther("0.5");
+    console.log("Create new NFT club");
+    const txFaucet = await faucet.connect(manager).faucet();
+    await txFaucet.wait();
+    const tokenId = await faucet.getId();
 
-    console.log("Create new lottrey club");
-    const txCreate = await factory
-        .connect(manager)
-        .createNftClub("Club NFTS", ticketPrice, 8);
+    const txCreate = await factory.connect(manager).createClubNFT(
+        "Coba duluserssddss",
+        deposit,
+        8
+    );
     const receiptCreate = await txCreate.wait();
-    const event = receiptCreate.events[0];
-    const clubAddress = event.args[0];
+    const eventCreate = receiptCreate.events[0];
+    const club = await hre.ethers.getContractAt("LotteryClubNFT", eventCreate.args[0]);
     console.clear();
 
-    console.log("Start lottrey and member register");
-    const club = await hre.ethers.getContractAt("LottreyClubNFT", clubAddress);
-
-    const txApprove = await nft.connect(manager).approve(club.address, 0);
+    console.log("Start lottery");
+    const txApprove = await faucet.connect(manager).approve(
+        club.address,
+        tokenId.sub(1)
+    );
     await txApprove.wait();
 
-    const txStart = await club
-        .connect(manager)
-        .startLottreyAndSetPrize(nft.address, 0);
+    const txStart = await club.connect(manager).start(
+        faucet.address,
+        tokenId.sub(1)
+    );
     await txStart.wait();
     console.clear();
 
-    for (let i = 2; i <= 9; i++) {
-        console.log("Member Register: ", accountList[i].address);
-        const txRegister = await club
-            .connect(accountList[i])
-            .registerMember({ value: ticketPrice });
-        await txRegister.wait();
+    console.log("Register member");
+    for(let i = 2; i <= 9; i++) {
+        console.log("Member register : ", accountList[i].address);
+        let txRegister = await club.connect(accountList[i]).registerMember({value:deposit});
+        await txRegister.wait(2);
     }
     console.clear();
 
-    console.log("End lottrey and draw");
-    const txEnd = await club.connect(manager).endLottreyAndDraw();
-    const receiptEnd = await txEnd.wait();
-    const eventWiner = receiptEnd.events[1];
-    const winer = eventWiner.args[0];
+    console.log("Finish and draw");
+    const txFinish = await club.connect(manager).finishAndDraw();
+    const receiptFinish = await txFinish.wait();
+    const eventFinish = receiptFinish.events[1];
+    const winer = eventFinish.args[1]
     console.clear();
-
-    console.log("======================================");
+    console.log("======================================")
     console.log("Factory Address:     ", factory.address);
     console.log("Manager Address:     ", manager.address);
     console.log("Club Address   :     ", club.address);
@@ -77,14 +71,18 @@ async function simulation(accountList, nft, factory) {
     console.log("======================================");
 }
 
-async function main() {
-    const nft = await hre.ethers.getContractAt("MyNFT", "0xe269dF872C98dff17651374Ba941053b0694A2A8");
-    const factory = await hre.ethers.getContractAt("LottreyClubFactory", "0x4F57Dee9e616a36d1840A59A6d51840c0ac34292");
-    const accountList = await setup(nft);
-    await simulation(accountList, nft, factory);
+async function main(){
+    factoryAddress = "0x86e688700cA81Eb369b636393667618cF3f053B2";
+    faucetAddress = "0x182Be05B2c3A4DCA71547893b968f834860F819A";
+
+    const factory = await hre.ethers.getContractAt("LotteryClubFactory", factoryAddress);
+    const faucet = await hre.ethers.getContractAt("NFT", faucetAddress);
+
+    accountList = await setup();
+    await simulation(accountList, factory, faucet);
 }
 
 main().catch((error) => {
     console.error(error);
     process.exitCode = 1;
-});
+})
