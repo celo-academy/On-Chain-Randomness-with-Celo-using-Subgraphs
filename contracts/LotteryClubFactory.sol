@@ -2,79 +2,97 @@
 pragma solidity 0.8.15;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "./interface/IRandom.sol";
-import "./interface/ILotteryClub.sol";
-import "./interface/ILotteryClubNFT.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "./LotteryClub.sol";
-import "./LotteryClubNFT.sol";
+import "./LotteryClubToken.sol";
 
-contract LotteryClubFactory {
+import "./interface/ILotteryClubToken.sol";
+
+contract LotteryClubFactory is Ownable {
     using SafeMath for uint256;
-    uint256 public constant MAX_OWNER_CLUB = 3;
-    uint256 public MANAGER_FEE_PERCENT = 2;
 
+    uint256 private _managerFeePercent;
+    uint256 private MAX_OWNER_CLUB = 3;
+
+    mapping(address => uint256) private _clubOwnerCounters;
     mapping(address => bool) private _clubStatus;
-    mapping(address => uint256) private _clubOwnerCounter;
 
-    event Club(address indexed club_, address indexed manager_, string name_, uint256 reward_, uint256 deposit_, uint256 membersLimit_);
-    event ClubNFT(address indexed club_, address indexed manager_, string name_, uint256 deposit_, uint256 membersLimit_);
+    address[] private _allClubAddress;
 
-    function createClub(
+    event NewClub(
+        address indexed clubAddress,
+        address indexed owner,
+        string name,
+        uint256 reward,
+        uint256 deposit,
+        uint256 membersLimit
+    );
+
+    constructor(uint256 managerFee_) {
+        _managerFeePercent = managerFee_;
+    }
+
+    function createClubToken(
         string calldata name_,
         uint256 deposit_,
         uint256 membersLimit_,
         address rewardAddress_
     ) external {
-        require(_clubOwnerCounter[msg.sender] <= MAX_OWNER_CLUB);
-        require(deposit_ > 0);
-        require(membersLimit_ > 0);
-        require(rewardAddress_ != address(0));
-        (uint256 reward, uint256 managerFee) = _calculateReward(deposit_, membersLimit_);
-        bytes32 salt = keccak256(
-            abi.encodePacked(name_, deposit_, membersLimit_, rewardAddress_, msg.sender)
+        require(
+            _clubOwnerCounters[msg.sender] <= MAX_OWNER_CLUB,
+            "LotteryClubFactory: You can't create more than 3 clubs"
         );
-        require(!_checkAddress(salt));
-        LotteryClub club = (new LotteryClub){salt: salt}();
-        ILotteryClub(address(club)).initialize(
-            name_,
-            reward,
-            deposit_,
-            membersLimit_,
-            managerFee,
-            msg.sender,
-            rewardAddress_
+        require(
+            deposit_ > 0,
+            "LotteryClubFactory: Deposit must be greater than 0"
         );
-        _clubStatus[address(club)] = true;
-        _clubOwnerCounter[msg.sender] +=1;
-        emit Club(
-            address(club),
-            msg.sender,
-            name_,
-            reward,
+        require(
+            membersLimit_ > 0,
+            "LotteryClubFactory: Members limit must be greater than 0"
+        );
+        require(
+            rewardAddress_ != address(0),
+            "LotteryClubFactory: Reward address can't be 0x0"
+        );
+        (uint256 reward_, uint256 managerFee_) = _calculateReward(
             deposit_,
             membersLimit_
         );
-    }
-
-    function createClubNFT(string calldata name_, uint256 deposit_, uint256 membersLimit_) external {
-        require(_clubOwnerCounter[msg.sender] <= MAX_OWNER_CLUB);
-        require(deposit_ > 0);
-        require(membersLimit_ > 0);
         bytes32 salt = keccak256(
-            abi.encodePacked(name_, deposit_, membersLimit_, msg.sender)
+            abi.encodePacked(
+                name_,
+                deposit_,
+                membersLimit_,
+                rewardAddress_,
+                msg.sender
+            )
         );
-        require(!_checkAddress(salt));
-        LotteryClubNFT club = (new LotteryClubNFT){salt:salt}();
-        ILotteryClubNFT(address(club)).initialize(
+        require(
+            !_checkAddress(salt),
+            "LotteryClubFactory: Club already exists"
+        );
+        LotteryClubToken club = (new LotteryClubToken){salt: salt}();
+        ILotteryClubToken(address(club)).initialize(
             name_,
+            reward_,
             deposit_,
             membersLimit_,
+            managerFee_,
+            rewardAddress_,
             msg.sender
         );
+        _clubOwnerCounters[msg.sender] += 1;
         _clubStatus[address(club)] = true;
-        _clubOwnerCounter[msg.sender] += 1;
-        emit ClubNFT(address(club), msg.sender, name_, deposit_, membersLimit_);
+        _allClubAddress.push(address(club));
+
+        emit NewClub(
+            address(club),
+            msg.sender,
+            name_,
+            reward_,
+            deposit_,
+            membersLimit_
+        );
     }
 
     function _checkAddress(bytes32 salt_) private view returns (bool) {
@@ -87,7 +105,9 @@ contract LotteryClubFactory {
                             address(this),
                             salt_,
                             keccak256(
-                                abi.encodePacked(type(LotteryClub).creationCode)
+                                abi.encodePacked(
+                                    type(LotteryClubToken).creationCode
+                                )
                             )
                         )
                     )
@@ -103,7 +123,7 @@ contract LotteryClubFactory {
         returns (uint256 reward_, uint256 managerFee_)
     {
         uint256 baseReward = deposit_.mul(membersLimit_);
-        managerFee_ = baseReward.div(100).mul(MANAGER_FEE_PERCENT);
+        managerFee_ = baseReward.div(100).mul(_managerFeePercent);
         reward_ = baseReward.sub(managerFee_);
     }
 }

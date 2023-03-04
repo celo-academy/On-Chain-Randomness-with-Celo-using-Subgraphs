@@ -1,51 +1,49 @@
 const hre = require("hardhat");
 
 async function setup(token) {
-    console.log("Setting up accounts");
-    const accountList = await hre.ethers.getSigners();
-    const transferAmount = await hre.ethers.utils.parseEther("1.5");
+    console.log("Setting up...");
+    const accounts = await hre.ethers.getSigners();
+    const amount = hre.ethers.utils.parseEther("2")
+    console.clear();
 
     for(let i = 1; i <= 9; i++) {
-        console.log("Transfer to: ", accountList[i].address);
-        const tx = await token.connect(accountList[0]).transfer(
-            accountList[i].address,
-            transferAmount
+        console.log("Transfer to: ", accounts[i].address);
+        const tx = await token.connect(accounts[0]).transfer(
+            accounts[i].address,
+            amount
         );
         await tx.wait();
     }
-    console.clear();
-    return accountList;
+
+    return accounts;
 }
 
-async function simulation(accountList, factory, token) {
-    console.log("Simulation");
+async function simulation(accountList, token, factory) {
+    console.log("Start simulation")
+    const deposit = hre.ethers.utils.parseEther("1");
+    const manager = accountList[1];
+    
     console.clear();
-
-    let manager = accountList[1];
-    let depositAmount = hre.ethers.utils.parseEther("0.5");
-
-    console.log("Create new lottrey club");
-    const txCreate = await factory.connect(manager).createClub(
-        "Sut",
-        depositAmount,
+    console.log("Create new club");
+    const txCreate = await factory.connect(manager).createClubToken(
+        "Club 1",
+        deposit,
         8,
         token.address
     );
     const receiptCreate = await txCreate.wait();
-    const event = receiptCreate.events[0];
-    const clubAddress = event.args[0];
+    const clubAddress = receiptCreate.events[0].args[0];
+    const club = await hre.ethers.getContractAt("LotteryClubToken", clubAddress)
     console.clear();
-
-    console.log("Start lottery and member register");
-    const club = await hre.ethers.getContractAt("LotteryClub", clubAddress);
-
+    // console.log(clubAddress)
+    
+    console.log("Start lottery and register");
     const txStart = await club.connect(manager).start();
     await txStart.wait();
-    // console.log("club: ", club.address)
 
     for(let i = 2; i <= 9; i++) {
         console.log("Member register: ", accountList[i].address);
-        const txApprove = await token.connect(accountList[i]).approve(club.address, depositAmount);
+        const txApprove = await token.connect(accountList[i]).approve(club.address, deposit);
         await txApprove.wait();
 
         const txRegister = await club.connect(accountList[i]).register();
@@ -53,30 +51,32 @@ async function simulation(accountList, factory, token) {
     }
     console.clear();
 
-    console.log("Finish and draw");
-    const txFinish = await club.connect(manager).finishAndDraw();
-    const receiptFinish = await txFinish.wait();
-    const eventWiner = receiptFinish.events[1];
-    const winer = eventWiner.args[1];
+    console.log("Draw lottery");
+    const txDraw = await club.connect(manager).draw();
+    const receiptDraw = await txDraw.wait();
+    const winner = receiptDraw.events[1].args[0];
     console.clear();
 
-    console.log("======================================")
+    console.log("Manager claim fee");
+    const txClaimFee = await club.connect(manager).claimFee();
+    await txClaimFee.wait();
+
+    console.log("======================================");
     console.log("Factory Address:     ", factory.address);
     console.log("Manager Address:     ", manager.address);
     console.log("Club Address   :     ", club.address);
-    console.log("Winer Address  :     ", winer);
+    console.log("Winer Address  :     ", winner);
     console.log("======================================");
-
 }
 
 async function main() {
     const token = await hre.ethers.getContractAt("Token", "0xF194afDf50B03e69Bd7D057c1Aa9e10c9954E4C9");
-    const factory = await hre.ethers.getContractAt("LotteryClubFactory", "0x86e688700cA81Eb369b636393667618cF3f053B2");
+    const factory = await hre.ethers.getContractAt("LotteryClubFactory","0xFA30dc124207E1e7B9499707BC5cA6B5654bbAb3");
     const accountList = await setup(token);
-    await simulation(accountList, factory, token);
+    await simulation(accountList, token, factory);
 }
 
 main().catch((error) => {
     console.error(error);
-    process.exitCode=1;
+    process.exitCode = 1;
 })
