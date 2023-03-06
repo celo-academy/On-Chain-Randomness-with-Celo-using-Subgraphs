@@ -8,20 +8,20 @@ import "./interface/IRandom.sol";
 contract LotteryClubToken {
     using SafeMath for uint256;
 
-    string private _name;
-    uint256 private _reward;
-    uint256 private _deposit;
-    uint256 private _membersLimit;
+    string public name;
+    uint256 public reward;
+    uint256 public deposit;
+    uint256 public membersLimit;
     uint256 private _managerFee;
-    uint256 private _feePercent;
+    uint256 private constant FEE_PERCENT = 2;
 
-    address private _rewardAddress;
-    address private _winer;
-    address private _manager;
-    address private _factory;
+    address public rewardAddress;
+    address public winer;
+    address public manager;
+    address public factory;
     address[] private _membersCounters;
 
-    bool private _isLotteryStatus = false;
+    bool public lotteryStatus = false;
 
     IRandom private constant RANDOMNESS_ADDRESS =
         IRandom(0xdd318EEF001BB0867Cd5c134496D6cF5Aa32311F);
@@ -30,18 +30,23 @@ contract LotteryClubToken {
 
     modifier onlyManager() {
         require(
-            msg.sender == _manager,
+            msg.sender == manager,
             "LotteryClubToken: Only manager can call this function"
         );
         _;
     }
 
-    event Winer(address indexed winer_, uint256 reward_, uint256 timestamp_);
+    event RewardUpdate(
+        uint256 reward_,
+        uint256 deposit_,
+        uint256 membersLimit_
+    );
+
+    event Winer(address indexed winer_);
 
     constructor() {
-        _factory = msg.sender;
-        _winer = address(0);
-        _feePercent = 2;
+        factory = msg.sender;
+        winer = address(0);
     }
 
     function initialize(
@@ -54,141 +59,95 @@ contract LotteryClubToken {
         address manager_
     ) external {
         require(
-            msg.sender == _factory,
+            msg.sender == factory,
             "LotteryClubToken: Only factory can call this function"
         );
-        _name = name_;
-        _reward = reward_;
-        _deposit = deposit_;
-        _membersLimit = membersLimit_;
+        name = name_;
+        reward = reward_;
+        deposit = deposit_;
+        membersLimit = membersLimit_;
         _managerFee = managerFee_;
-        _rewardAddress = rewardAddress_;
-        _manager = manager_;
-    }
-
-    function setFeePercent(uint256 feePercent_) external {
-        require(
-            msg.sender == _factory,
-            "LotteryClubToken: Only factory can call this function"
-        );
-        _feePercent = feePercent_;
-        _updateReward();
-    }
-
-    function name() external view returns(string memory) {
-        return _name;
-    }
-
-    function reward() external view returns(uint256) {
-        return _reward;
-    }
-
-    function deposit() external view returns(uint256){
-        return _deposit;
-    }
-
-    function membersLimit() external view returns(uint256) {
-        return _membersLimit;
-    }
-
-    function rewardAddress() external view returns(address) {
-        return _rewardAddress;
-    }
-
-    function manager() external view returns(address) {
-        return _manager;
-    }
-
-    function factory() external view returns(address) {
-        return _factory;
+        rewardAddress = rewardAddress_;
+        manager = manager_;
     }
 
     function setDeposit(uint256 deposit_) external onlyManager {
-        require(
-            _isLotteryStatus == false,
-            "LotteryClubToken: Lottery is active"
-        );
+        require(!lotteryStatus, "LotteryClubToken: Lottery is running");
         require(
             deposit_ > 0,
             "LotteryClubToken: Deposit must be greater than 0"
         );
-        _deposit = deposit_;
+        deposit = deposit_;
         _updateReward();
     }
 
     function setMembersLimit(uint256 membersLimit_) external onlyManager {
-        require(
-            _isLotteryStatus == false,
-            "LotteryClubToken: Lottery is active"
-        );
+        require(!lotteryStatus, "LotteryClubToken: Lottery is running");
         require(
             membersLimit_ > 0,
             "LotteryClubToken: Members limit must be greater than 0"
         );
-        _membersLimit = membersLimit_;
+        membersLimit = membersLimit_;
         _updateReward();
     }
 
     function claimFee() external onlyManager {
+        require(!lotteryStatus, "LotteryClubToken: Lottery is running");
         require(
-            _isLotteryStatus == false,
-            "LotteryClubToken: Lottery is active"
+            _managerFee > 0,
+            "LotteryClubToken: Manager fee is 0"
         );
-        require(_managerFee > 0, "LotteryClubToken: Manager fee is 0");
-        uint256 amount = _managerFee;
         _managerFee = 0;
-        IERC20(_rewardAddress).transfer(msg.sender, amount);
+        IERC20(rewardAddress).transfer(manager, _managerFee);
     }
 
     function start() external onlyManager {
-        require(!_isLotteryStatus, "LotteryClubToken: Lottery is active");
-        _isLotteryStatus = true;
+        require(!lotteryStatus, "LotteryClubToken: Lottery is running");
+        lotteryStatus = true;
         _reset();
     }
 
     function draw() external onlyManager {
-        require(_isLotteryStatus, "LotteryClubToken: Lottery is not active");
+        require(lotteryStatus, "LotteryClubToken: Lottery is not running");
         require(
-            _membersCounters.length >= _membersLimit,
+            _membersCounters.length >= membersLimit,
             "LotteryClubToken: Not enough members"
         );
-        require(
-            address(this).balance >= _reward,
-            "LotteryClubToken: Not enough balance"
-        );
-        _isLotteryStatus = false;
-        _winer = _membersCounters[_getRandomNumber() % _membersCounters.length];
-        IERC20(_rewardAddress).transfer(_winer, _reward);
-        emit Winer(_winer, _reward, block.timestamp);
+        require(IERC20(rewardAddress).balanceOf(address(this)) >= reward, "LotteryClubToken: Not enough reward");
+        lotteryStatus = false;
+        winer = _membersCounters[_getRandomNumber() % _membersCounters.length];
+        IERC20(rewardAddress).transfer(winer, reward);
+        emit Winer(winer);
     }
 
     function register() external {
-        require(_isLotteryStatus, "LotteryClubToken: Lottery is not active");
+        require(lotteryStatus, "LotteryClubToken: Lottery is not running");
         require(
-            _membersCounters.length < _membersLimit,
-            "LotteryClubToken: Members limit is reached"
+            _membersCounters.length < membersLimit,
+            "LotteryClubToken: Members limit reached"
         );
         require(
             _userDeposit[msg.sender] == 0,
             "LotteryClubToken: You are already registered"
         );
-        IERC20(_rewardAddress).transferFrom(msg.sender, address(this), _deposit);
-        _userDeposit[msg.sender] = _deposit;
+        IERC20(rewardAddress).transferFrom(msg.sender, address(this), deposit);
+        _userDeposit[msg.sender] = deposit;
         _membersCounters.push(msg.sender);
     }
 
+    function _updateReward() private {
+        uint256 baseReward = deposit.mul(membersLimit);
+        _managerFee = baseReward.mul(FEE_PERCENT).div(100);
+        reward = baseReward.sub(_managerFee);
+        emit RewardUpdate(reward, deposit, membersLimit);
+    }
+
     function _reset() private {
-        _winer = address(0);
+        winer = address(0);
         for (uint256 i = 0; i < _membersCounters.length; i++) {
             _userDeposit[_membersCounters[i]] = 0;
         }
         _membersCounters = new address[](0);
-    }
-
-    function _updateReward() private {
-        uint256 baseReward = _deposit.mul(_membersLimit);
-        _managerFee = baseReward.div(100).mul(_feePercent);
-        _reward = baseReward.sub(_managerFee);
     }
 
     function _getRandomNumber() private view returns (uint256) {
