@@ -18,6 +18,7 @@
     "hardhat-gas-reporter": "^1.0.9"
   },
   "dependencies": {
+    "@graphprotocol/graph-cli": "^0.42.3",
     "@openzeppelin/contracts": "4.8.0",
     "dotenv": "^16.0.1"
   }
