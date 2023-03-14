@@ -39,10 +39,11 @@ contract LotteryClubToken {
     event RewardUpdate(
         uint256 reward_,
         uint256 deposit_,
-        uint256 membersLimit_
+        uint256 membersLimit_,
+        address club
     );
 
-    event Winer(address indexed winer_);
+    event Winer(address indexed winer_, address club);
 
     constructor() {
         factory = msg.sender;
@@ -97,8 +98,9 @@ contract LotteryClubToken {
             _managerFee > 0,
             "LotteryClubToken: Manager fee is 0"
         );
+        uint256 _feeAmount = _managerFee;
         _managerFee = 0;
-        IERC20(rewardAddress).transfer(manager, _managerFee);
+        IERC20(rewardAddress).transfer(manager, _feeAmount);
     }
 
     function start() external onlyManager {
@@ -117,7 +119,7 @@ contract LotteryClubToken {
         lotteryStatus = false;
         winer = _membersCounters[_getRandomNumber() % _membersCounters.length];
         IERC20(rewardAddress).transfer(winer, reward);
-        emit Winer(winer);
+        emit Winer(winer, address(this));
     }
 
     function register() external {
@@ -139,7 +141,7 @@ contract LotteryClubToken {
         uint256 baseReward = deposit.mul(membersLimit);
         _managerFee = baseReward.mul(FEE_PERCENT).div(100);
         reward = baseReward.sub(_managerFee);
-        emit RewardUpdate(reward, deposit, membersLimit);
+        emit RewardUpdate(reward, deposit, membersLimit, address(this));
     }
 
     function _reset() private {

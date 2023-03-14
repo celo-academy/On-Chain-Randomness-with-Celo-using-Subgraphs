@@ -1,20 +1,19 @@
 const hre = require("hardhat");
 
+async function main(){
+    console.log("Deploy Contract");
 
-async function main() {
-    console.log("Deploy factory & faucet");
-    const factoryContract = await hre.ethers.getContractFactory("LotteryClubFactory");
-    const faucetContract = await hre.ethers.getContractFactory("NFT");
-
-    const factory = await factoryContract.deploy();
+    const contract = await hre.ethers.getContractFactory("LotteryClubFactory");
+    const factory = await contract.deploy();
     await factory.deployed();
 
-    const faucet = await faucetContract.deploy();
-    await faucet.deployed();
+    const contracts = await hre.ethers.getContractFactory("NFT");
+    const nft = await contracts.deploy();
+    await nft.deployed();
     console.clear();
 
-    console.log("Factory : ", factory.address);
-    console.log("Faucet : ", faucet.address);
+    console.log("Factory Address : ", factory.address);
+    console.log("NFT Address     : ", nft.address);
 }
 
 main().catch((error) => {

@@ -31,9 +31,9 @@ contract LotteryClubNFT {
         _;
     }
 
-    event RewardUpdate(address indexed rewardAddress_, uint256 reward_);
-    event LimitAndDepoUpdate(uint256 update_, string name_);
-    event Winer(address indexed winer_);
+    event RewardUpdate(address indexed rewardAddress_, uint256 reward_, address club_);
+    event LimitAndDepoUpdate(uint256 update_, string name_, address club_);
+    event Winer(address indexed winer_, address club_);
 
     constructor() {
         factory = msg.sender;
@@ -63,33 +63,14 @@ contract LotteryClubNFT {
             "LotteryClubNFT: Members limit must be greater than 0"
         );
         membersLimit = _membersLimit;
-        emit LimitAndDepoUpdate(_membersLimit, "membersLimit");
+        emit LimitAndDepoUpdate(_membersLimit, "membersLimit", address(this));
     }
 
     function setDeposit(uint256 _deposit) external onlyManager {
         require(!lotteryStatus, "LotteryClubNFT: Lottery is already started");
         require(_deposit > 0, "LotteryClubNFT: Deposit must be greater than 0");
         deposit = _deposit;
-        emit LimitAndDepoUpdate(_deposit, "deposit");
-    }
-
-    function setReward(address _rewardAddress, uint256 _tokenId)
-        external
-        onlyManager
-    {
-        require(!lotteryStatus, "LotteryClubNFT: Lottery is already started");
-        require(
-            rewardAddress == address(0),
-            "LotteryClubNFT: Reward already set"
-        );
-        require(
-            _rewardAddress != address(0),
-            "LotteryClubNFT: Reward address is zero"
-        );
-        IERC721(_rewardAddress).transferFrom(msg.sender, address(this), _tokenId);
-        rewardAddress = _rewardAddress;
-        reward = _tokenId;
-        emit RewardUpdate(_rewardAddress, _tokenId);
+        emit LimitAndDepoUpdate(_deposit, "deposit", address(this));
     }
 
     function claimFee() external onlyManager {
@@ -99,11 +80,15 @@ contract LotteryClubNFT {
         require(status, "LotteryClubNFT: Transfer failed");
     }
 
-    function start() external onlyManager {
+    function start(address _rewardAddress, uint256 _tokenId) external onlyManager {
+        require(_rewardAddress != address(0), "LotteryClubNFT: Reward address is zero");
         require(!lotteryStatus, "LotteryClubNFT: Lottery is already started");
-        require(rewardAddress != address(0), "LotteryClubNFT: Reward not set");
+        require(rewardAddress == address(0), "LotteryClubNFT: Reward already set");
+        IERC721(_rewardAddress).transferFrom(msg.sender, address(this), _tokenId);
+        rewardAddress = _rewardAddress;
+        reward = _tokenId;
         lotteryStatus = true;
-        _reset();
+        emit RewardUpdate(_rewardAddress, _tokenId, address(this));
     }
 
     function draw() external onlyManager {
@@ -117,7 +102,7 @@ contract LotteryClubNFT {
         _userDeposit[winer] = 0;
         IERC721(rewardAddress).transferFrom(address(this), winer, reward);
         _batchTransfer();
-        emit Winer(winer);
+        emit Winer(winer, address(this));
     }
 
     function register() external payable {

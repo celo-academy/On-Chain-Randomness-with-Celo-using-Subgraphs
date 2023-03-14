@@ -20,13 +20,13 @@ async function setup(token) {
 
 async function simulation(accountList, token, factory) {
     console.log("Start simulation")
-    const deposit = hre.ethers.utils.parseEther("1");
-    const manager = accountList[1];
-    
+    manager = accountList[1]
+    deposit = hre.ethers.utils.parseEther("0.5")
     console.clear();
-    console.log("Create new club");
-    const txCreate = await factory.connect(manager).createClubToken(
-        "Club 1",
+
+    console.log("Create new club")
+    const txCreate = await factory.connect(manager).clubToken(
+        "Final Test Token",
         deposit,
         8,
         token.address
@@ -35,9 +35,8 @@ async function simulation(accountList, token, factory) {
     const clubAddress = receiptCreate.events[0].args[0];
     const club = await hre.ethers.getContractAt("LotteryClubToken", clubAddress)
     console.clear();
-    // console.log(clubAddress)
-    
-    console.log("Start lottery and register");
+
+    console.log("Start and register members")
     const txStart = await club.connect(manager).start();
     await txStart.wait();
 
@@ -49,17 +48,26 @@ async function simulation(accountList, token, factory) {
         const txRegister = await club.connect(accountList[i]).register();
         await txRegister.wait();
     }
-    console.clear();
+    console.clear()
 
-    console.log("Draw lottery");
+    console.log("Draw lottery")
     const txDraw = await club.connect(manager).draw();
     const receiptDraw = await txDraw.wait();
     const winner = receiptDraw.events[1].args[0];
     console.clear();
-
-    console.log("Manager claim fee");
+    
+    console.log("Manager claim fee")
     const txClaimFee = await club.connect(manager).claimFee();
     await txClaimFee.wait();
+    console.clear()
+
+    console.log("Manager update members limit & deposit")
+    const txSetDeposit = await club.connect(manager).setDeposit(hre.ethers.utils.parseEther("0.1"));
+    await txSetDeposit.wait();
+
+    const txSetLimit = await club.connect(manager).setMembersLimit(5);
+    await txSetLimit.wait();
+    console.clear()
 
     console.log("======================================");
     console.log("Factory Address:     ", factory.address);
@@ -71,7 +79,7 @@ async function simulation(accountList, token, factory) {
 
 async function main() {
     const token = await hre.ethers.getContractAt("Token", "0xF194afDf50B03e69Bd7D057c1Aa9e10c9954E4C9");
-    const factory = await hre.ethers.getContractAt("LotteryClubFactory","0xFA30dc124207E1e7B9499707BC5cA6B5654bbAb3");
+    const factory = await hre.ethers.getContractAt("LotteryClubFactory","0x7d92b85cbEE92E3aA83586151Aeec8Fb75192247");
     const accountList = await setup(token);
     await simulation(accountList, token, factory);
 }
