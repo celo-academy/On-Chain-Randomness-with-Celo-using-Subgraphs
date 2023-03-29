@@ -3,7 +3,7 @@ const hre = require("hardhat");
 async function setup(token) {
     console.log("Setting up...");
     const accounts = await hre.ethers.getSigners();
-    const amount = hre.ethers.utils.parseEther("2")
+    const amount = hre.ethers.utils.parseEther("0.5")
     console.clear();
 
     for(let i = 1; i <= 9; i++) {
@@ -21,7 +21,7 @@ async function setup(token) {
 async function simulation(accountList, token, factory) {
     console.log("Start simulation")
     manager = accountList[1]
-    deposit = hre.ethers.utils.parseEther("0.5")
+    deposit = hre.ethers.utils.parseEther("0.01")
     console.clear();
 
     console.log("Create new club")
@@ -79,7 +79,7 @@ async function simulation(accountList, token, factory) {
 
 async function main() {
     const token = await hre.ethers.getContractAt("Token", "0xF194afDf50B03e69Bd7D057c1Aa9e10c9954E4C9");
-    const factory = await hre.ethers.getContractAt("LotteryClubFactory","0x7d92b85cbEE92E3aA83586151Aeec8Fb75192247");
+    const factory = await hre.ethers.getContractAt("LotteryClubFactory","0x4643732F145813Ac030B1fE37e39b7d743173cAf");
     const accountList = await setup(token);
     await simulation(accountList, token, factory);
 }

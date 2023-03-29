@@ -28,7 +28,7 @@ async function simulation(accountList, nft, factory) {
     const tokenId = await nft.getId();
 
     const txCreate = await factory.connect(manager).clubNFT(
-        "Finals Test NFT",
+        "Finals Test",
         deposit,
         8
     );
@@ -79,8 +79,8 @@ async function simulation(accountList, nft, factory) {
 }
 
 async function main(){
-    nft = await hre.ethers.getContractAt("NFT", "0x5EF7dF43D5162c73008b5e65050B7899A64C77c3");
-    factory = await hre.ethers.getContractAt("LotteryClubFactory", "0x7d92b85cbEE92E3aA83586151Aeec8Fb75192247");
+    nft = await hre.ethers.getContractAt("NFT", "0xA53FB823092631A6C0dB4D883De18481d99b306b");
+    factory = await hre.ethers.getContractAt("LotteryClubFactory", "0x4643732F145813Ac030B1fE37e39b7d743173cAf");
     const accountList = await setup();
     await simulation(accountList, nft, factory);
 }

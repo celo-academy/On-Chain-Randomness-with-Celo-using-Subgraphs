@@ -8,6 +8,9 @@ Try running some of the following tasks:
 # Deploy contract
 npx hardhat run scripts/deploy.js --network alfajores
 
+# Deploy Token & NFT Test
+npx hardhat run scripts/faucet.js --network alfajores
+
 # Run simulation lottrey club native
 npx hardhat run scripts/simulation_native.js --network alfajores
 

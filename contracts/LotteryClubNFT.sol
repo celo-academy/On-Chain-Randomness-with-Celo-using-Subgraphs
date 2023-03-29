@@ -136,6 +136,7 @@ contract LotteryClubNFT {
 
     function _reset() private {
         winer = address(0);
+        rewardAddress = address(0);
         for (uint256 i = 0; i < _membersCounters.length; i++) {
             _userDeposit[_membersCounters[i]] = 0;
         }
